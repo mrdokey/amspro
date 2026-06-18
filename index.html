@@ -12,6 +12,33 @@
     <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+  
+  <!-- =========================================================================
+     TEMPORARY TABLET DEBUGER (Hapus jika sistem sudah sepenuhnya stabil)
+     ========================================================================= -->
+<div id="tabletConsole" style="position:fixed; bottom:70px; right:10px; z-index:9999; background:rgba(0,0,0,0.9); color:#fff; font-family:monospace; font-size:11px; padding:12px; border-radius:10px; max-width:90%; max-height:220px; overflow:auto; display:none; border:2px solid #ff7675; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+    <div style="font-weight:bold; color:#ff7675; border-bottom:1px solid #555; padding-bottom:5px; margin-bottom:5px; d-flex justify-content-between;">
+        <span>⚠️ Tablet Debug Console</span>
+        <button onclick="document.getElementById('tabletConsole').style.display='none'" style="background:none; border:none; color:#aaa; float:right; cursor:pointer;">[Tutup]</button>
+    </div>
+    <pre id="consoleOutput" style="margin:0; white-space:pre-wrap; color:#fab1a0;"></pre>
+</div>
+<script>
+    // Tangkap error Javascript biasa (runtime error)
+    window.onerror = function(message, source, lineno, colno, error) {
+        showTabletError(`ERR: ${message}\nLine: ${lineno} | Col: ${colno}`);
+    };
+    // Tangkap error asinkronus (kegagalan fetch, JSON parsing, dll)
+    window.addEventListener("unhandledrejection", function(event) {
+        showTabletError(`PROMISE REJECT: ${event.reason}`);
+    });
+    function showTabletError(msg) {
+        var con = document.getElementById("tabletConsole");
+        if(con) con.style.display = "block";
+        var output = document.getElementById("consoleOutput");
+        if(output) output.innerText += msg + "\n----------------\n";
+    }
+</script>
 
     <!-- Overlay Backdrop untuk Menutup Sidebar -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
