@@ -54,12 +54,12 @@ body {
     left: 0;
     top: 0;
     width: 100%;
-    height: 100%;
     background-color: var(--primary-color);
     display: flex;
-    align-items: center;
-    padding: 0 20px;
+    flex-direction: column;
+    padding: 12px 20px; /* Lebarkan sedikit padding untuk ruang filter */
     z-index: 1032;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .header-search-bar input::placeholder {
@@ -317,4 +317,37 @@ input:focus,
 
 .list-group-item:hover {
     background-color: rgba(30, 136, 229, 0.04);
+}
+
+/* =========================================================================
+   QUICK FILTER CHIPS STYLING (APPSHEET CHIPS LOOK)
+   ========================================================================= */
+.badge-chip {
+    background-color: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+/* Status Aktif: Warna berbalik menjadi putih menyala dengan teks biru */
+.badge-chip.active {
+    background-color: white !important;
+    color: var(--primary-color) !important;
+    border-color: white !important;
+    font-weight: bold;
+}
+
+.badge-chip:active {
+    transform: scale(0.95);
+}
+
+/* Sembunyikan scrollbar horizontal agar tampilan saringan chip terlihat rapi */
+#searchFilterChips::-webkit-scrollbar {
+    display: none;
 }

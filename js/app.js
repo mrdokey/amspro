@@ -1,5 +1,5 @@
 // =========================================================================
-// AMS PRO - APP CONTROLLER & SPA ROUTER (MODULAR V1.3 - REVISED NAV & SEARCH)
+// AMS PRO - APP CONTROLLER & SPA ROUTER (MODULAR V1.4 - MULTI-FILTER)
 // =========================================================================
 
 const MASTER_GAS_URL = "https://script.google.com/macros/s/AKfycbxdnEun8-kSEK_9c0j8kQXMD6VNU8q_D-xGV-33dQ8SM6uuLZiGjDewh-RNPWq4YBHk/exec";
@@ -33,11 +33,12 @@ function initUIOrchestrator(clientToken) {
     const appViews = document.querySelectorAll(".app-view");
     const fabAddUnit = document.getElementById("btnFabAddUnit");
 
-    // Elemen Pencarian Header
+    // Elemen Pencarian & Saringan Header
     const btnSearchTrigger = document.getElementById("btnHeaderSearchTrigger");
     const headerSearchBar = document.getElementById("headerSearchBar");
     const btnCloseSearch = document.getElementById("btnCloseHeaderSearch");
     const txtHeaderSearch = document.getElementById("txtHeaderSearch");
+    const filterChips = document.querySelectorAll(".badge-chip");
 
     let lastActiveTab = "dashboard";
     let isSubViewActive = false;
@@ -48,37 +49,44 @@ function initUIOrchestrator(clientToken) {
     window.switchViewSPA = function(viewId, customTitle, isSubView = false) {
         appViews.forEach(view => {
             view.classList.add("d-none");
-            view.classList.remove("active-view"); // Matikan animasi
+            view.classList.remove("active-view");
         });
         
         const targetView = document.getElementById(`view-${viewId}`);
         if (targetView) {
             targetView.classList.remove("d-none");
-            
-            // Force reflow browser untuk memastikan animasi CSS mentransisikan elemen dari kanan ke tengah
             targetView.offsetHeight; 
-            targetView.classList.add("active-view"); // Picu animasi geser
+            targetView.classList.add("active-view");
         }
 
         lblHeaderTitle.innerText = customTitle;
         isSubViewActive = isSubView;
 
+        // RESET PENYARINGAN SAAT BERPINDAH TAB (Mencegah kebocoran filter antar halaman)
+        if (headerSearchBar) {
+            headerSearchBar.classList.add("d-none");
+            if (txtHeaderSearch) txtHeaderSearch.value = "";
+            filterChips.forEach(chip => {
+                if (chip.getAttribute("data-filter") === "all") chip.classList.add("active");
+                else chip.classList.remove("active");
+            });
+            window.filterActiveViewContent(); // Kembalikan visibilitas default semua baris
+        }
+
         // ANIMASI NAVIGASI HEADER: Hamburger vs Back Arrow (<-)
         const hamburgerIcon = btnHamburger.querySelector("i");
         if (isSubView) {
             hamburgerIcon.className = "fas fa-arrow-left text-white";
-            if (fabAddUnit) fabAddUnit.classList.add("d-none"); // Sembunyikan FAB saat masuk detail/form
+            if (fabAddUnit) fabAddUnit.classList.add("d-none");
         } else {
             hamburgerIcon.className = "fas fa-bars text-white";
             lastActiveTab = viewId;
             
-            // Atur status aktif tab navigasi bawah
             tabButtons.forEach(btn => {
                 if (btn.getAttribute("data-tab") === viewId) btn.classList.add("active");
                 else btn.classList.remove("active");
             });
 
-            // TAMPILKAN FAB HANYA DI TAB DASHBOARD UTAMA
             if (viewId === "dashboard" && fabAddUnit) {
                 fabAddUnit.classList.remove("d-none");
             } else {
@@ -119,7 +127,20 @@ function initUIOrchestrator(clientToken) {
         });
     }
 
-    // D. SINKRONISASI PENCARIAN HEADER SECARA UNIVERSAL
+    // D. PENANGANAN AKTIF TOMBOL SARINGAN CHIP (FILTER CHIPS EVENT)
+    filterChips.forEach(chip => {
+        chip.addEventListener("click", () => {
+            // Matikan status aktif di semua chip saringan
+            filterChips.forEach(c => c.classList.remove("active"));
+            // Nyalakan status aktif di chip yang ditekan
+            chip.classList.add("active");
+            
+            // Picu pembaruan saringan konten secara instan
+            window.filterActiveViewContent();
+        });
+    });
+
+    // E. SINKRONISASI PENCARIAN HEADER SECARA UNIVERSAL
     if (btnSearchTrigger && headerSearchBar && btnCloseSearch) {
         btnSearchTrigger.addEventListener("click", () => {
             headerSearchBar.classList.remove("d-none");
@@ -129,11 +150,15 @@ function initUIOrchestrator(clientToken) {
         btnCloseSearch.addEventListener("click", () => {
             headerSearchBar.classList.add("d-none");
             txtHeaderSearch.value = "";
-            window.filterActiveViewContent(""); // Bersihkan saringan pencarian
+            filterChips.forEach(c => {
+                if (c.getAttribute("data-filter") === "all") c.classList.add("active");
+                else c.classList.remove("active");
+            });
+            window.filterActiveViewContent(); // Kembalikan semua baris
         });
     }
 
-    // E. MANUAL SYNC BUTTON
+    // F. MANUAL SYNC BUTTON
     btnSync.addEventListener("click", async () => {
         const icon = btnSync.querySelector("i");
         icon.classList.add("fa-spin");
@@ -152,21 +177,19 @@ function initUIOrchestrator(clientToken) {
         setTimeout(() => { icon.classList.remove("fa-spin"); }, 800);
     });
 
-    // F. SIDEBAR DRAWER MENU ACTIONS (Hanya Menu Non-Bawaan AppSheet)
+    // G. SIDEBAR DRAWER MENU ACTIONS
     const menuItems = document.querySelectorAll(".nav-menu-item[data-menu]");
     menuItems.forEach(item => {
         item.addEventListener("click", (e) => {
             e.preventDefault();
             const targetMenuName = item.getAttribute("data-menu");
-
             sidebar.classList.remove("open");
             overlay.classList.remove("show");
-
             alert(`Modul "${targetMenuName}" terpilih.`);
         });
     });
 
-    // G. SINKRONISASI STATUS ANTREAN OFFLINE TERTUNDA
+    // H. SINKRONISASI STATUS ANTREAN OFFLINE TERTUNDA
     window.addEventListener('ams_queue_updated', (e) => {
         const queueLength = e.detail.queueLength;
         const offlineBox = document.getElementById("offlineStatusBox");
@@ -187,7 +210,7 @@ function initUIOrchestrator(clientToken) {
         }
     });
 
-    // H. AUTOMATIC INITIAL SYNC
+    // I. AUTOMATIC INITIAL SYNC
     if (window.AMSDatabase) {
         window.AMSDatabase.syncDataFromServer().then((success) => {
             if (success) {
@@ -198,8 +221,8 @@ function initUIOrchestrator(clientToken) {
 }
 
 /**
- * 🔍 CORE FILTER: FITUR PENCARIAN UNIVERSAL DI HEADER (MENDUKUNG SEMUA VIEW)
- * Mencari kecocokan teks secara dinamis di dalam kontainer view yang sedang aktif
+ * 🔍 CORE FILTER: FITUR SINKRONISASI MULTI-FILTER DI HEADER (TEKS + KATEGORI OFFLINE)
+ * Menangani pencarian teks dan filter status ketersediaan secara bersamaan
  */
 window.filterActiveViewContent = function(query) {
     const activeView = document.querySelector('.app-view:not(.d-none)');
@@ -207,12 +230,34 @@ window.filterActiveViewContent = function(query) {
 
     const q = query.toLowerCase().trim();
     
-    // Cari semua elemen baris di dalam view yang aktif (bisa di list-container, table tr, atau list-group-item)
+    // Temukan filter status aktif dari tombol chip tag
+    const activeChip = document.querySelector(".badge-chip.active");
+    const activeFilterTag = activeChip ? activeChip.getAttribute("data-filter").toLowerCase().trim() : "all";
+
+    // Kumpulkan seluruh elemen baris data yang ada di halaman aktif
     const rows = activeView.querySelectorAll('.list-container > div > div, .table tbody tr, .list-group-item');
     
     rows.forEach(row => {
-        const text = row.innerText.toLowerCase();
-        if (text.includes(q)) {
+        const rowText = row.innerText.toLowerCase();
+        
+        // A. Validasi Teks Pencarian
+        const matchesQuery = rowText.includes(q);
+        
+        // B. Validasi Filter Status Chip
+        let matchesStatusFilter = true;
+        if (activeFilterTag !== "all") {
+            // Saring berdasarkan teks status (tersedia/standby, rent/disewa, atau servis/bengkel)
+            if (activeFilterTag === "available") {
+                matchesStatusFilter = rowText.includes("available") || rowText.includes("standby");
+            } else if (activeFilterTag === "rent") {
+                matchesStatusFilter = rowText.includes("rent") || rowText.includes("disewa");
+            } else if (activeFilterTag === "servis") {
+                matchesStatusFilter = rowText.includes("servis") || rowText.includes("bengkel") || rowText.includes("rusak");
+            }
+        }
+
+        // C. Gabungkan Kedua Validasi (Multi-Criteria Gate)
+        if (matchesQuery && matchesStatusFilter) {
             row.style.setProperty('display', '', 'important');
         } else {
             row.style.setProperty('display', 'none', 'important');
