@@ -1,5 +1,5 @@
 // =========================================================================
-// AMS PRO - APP CONTROLLER & SPA ROUTER SINKRONISASI DATABASE (MODULAR V1.2)
+// AMS PRO - APP CONTROLLER & SPA ROUTER (MODULAR V1.3 - REVISED NAV & SEARCH)
 // =========================================================================
 
 const MASTER_GAS_URL = "https://script.google.com/macros/s/AKfycbxdnEun8-kSEK_9c0j8kQXMD6VNU8q_D-xGV-33dQ8SM6uuLZiGjDewh-RNPWq4YBHk/exec";
@@ -31,47 +31,67 @@ function initUIOrchestrator(clientToken) {
     const lblHeaderTitle = document.getElementById("lblHeaderTitle");
     const tabButtons = document.querySelectorAll(".nav-tab-btn");
     const appViews = document.querySelectorAll(".app-view");
+    const fabAddUnit = document.getElementById("btnFabAddUnit");
 
-    // Menampung riwayat navigasi untuk tombol "Back Arrow"
+    // Elemen Pencarian Header
+    const btnSearchTrigger = document.getElementById("btnHeaderSearchTrigger");
+    const headerSearchBar = document.getElementById("headerSearchBar");
+    const btnCloseSearch = document.getElementById("btnCloseHeaderSearch");
+    const txtHeaderSearch = document.getElementById("txtHeaderSearch");
+
     let lastActiveTab = "dashboard";
     let isSubViewActive = false;
 
     /**
-     * 🔄 UTILITY: SWITCH VIEW UTAMA SPA
+     * 🔄 SWITCH VIEW SPA DENGAN EFFECT SMOOTH (SLIDE-IN ACCELERATION)
      */
     window.switchViewSPA = function(viewId, customTitle, isSubView = false) {
-        appViews.forEach(view => view.classList.add("d-none"));
+        appViews.forEach(view => {
+            view.classList.add("d-none");
+            view.classList.remove("active-view"); // Matikan animasi
+        });
         
         const targetView = document.getElementById(`view-${viewId}`);
         if (targetView) {
             targetView.classList.remove("d-none");
+            
+            // Force reflow browser untuk memastikan animasi CSS mentransisikan elemen dari kanan ke tengah
+            targetView.offsetHeight; 
+            targetView.classList.add("active-view"); // Picu animasi geser
         }
 
         lblHeaderTitle.innerText = customTitle;
         isSubViewActive = isSubView;
 
-        // ANIMASI NAVIGASI HEADER: Hambuger vs Back Arrow (<-)
+        // ANIMASI NAVIGASI HEADER: Hamburger vs Back Arrow (<-)
         const hamburgerIcon = btnHamburger.querySelector("i");
         if (isSubView) {
-            hamburgerIcon.className = "fas fa-arrow-left text-white"; // Ubah jadi panah kembali
+            hamburgerIcon.className = "fas fa-arrow-left text-white";
+            if (fabAddUnit) fabAddUnit.classList.add("d-none"); // Sembunyikan FAB saat masuk detail/form
         } else {
-            hamburgerIcon.className = "fas fa-bars text-white"; // Kembalikan jadi hamburger menu
+            hamburgerIcon.className = "fas fa-bars text-white";
             lastActiveTab = viewId;
-            // Aktifkan kembali status tab navigasi bawah yang sesuai
+            
+            // Atur status aktif tab navigasi bawah
             tabButtons.forEach(btn => {
                 if (btn.getAttribute("data-tab") === viewId) btn.classList.add("active");
                 else btn.classList.remove("active");
             });
+
+            // TAMPILKAN FAB HANYA DI TAB DASHBOARD UTAMA
+            if (viewId === "dashboard" && fabAddUnit) {
+                fabAddUnit.classList.remove("d-none");
+            } else {
+                if (fabAddUnit) fabAddUnit.classList.add("d-none");
+            }
         }
     };
 
-    // A. TOGGLE BUTTON (HAMBURGER / BACK ARROW CLICK HANDLER)
+    // A. TOGGLE BUTTON (HAMBURGER / BACK ARROW)
     btnHamburger.addEventListener("click", () => {
         if (isSubViewActive) {
-            // Jika berada di detail/form, klik panah kembali akan memulangkan staff ke tab semula
             window.switchViewSPA(lastActiveTab, lastActiveTab.charAt(0).toUpperCase() + lastActiveTab.slice(1), false);
         } else {
-            // Jika berada di menu utama, buka sidebar drawer seperti biasa
             sidebar.classList.add("open");
             overlay.classList.add("show");
         }
@@ -82,7 +102,7 @@ function initUIOrchestrator(clientToken) {
         overlay.classList.remove("show");
     });
 
-    // B. BOTTOM NAVIGATION ROUTER (Tab Switcher SPA)
+    // B. BOTTOM NAVIGATION ROUTER
     tabButtons.forEach(btn => {
         btn.addEventListener("click", () => {
             const targetTab = btn.getAttribute("data-tab");
@@ -91,7 +111,29 @@ function initUIOrchestrator(clientToken) {
         });
     });
 
-    // C. MANUAL SYNC BUTTON
+    // C. FLOATING ACTION BUTTON (FAB) TAMBAH UNIT
+    if (fabAddUnit) {
+        fabAddUnit.addEventListener("click", () => {
+            window.switchViewSPA("unit-form", "Tambah Unit Baru", true);
+            if (window.AMSUI) window.AMSUI.renderUnitForm("");
+        });
+    }
+
+    // D. SINKRONISASI PENCARIAN HEADER SECARA UNIVERSAL
+    if (btnSearchTrigger && headerSearchBar && btnCloseSearch) {
+        btnSearchTrigger.addEventListener("click", () => {
+            headerSearchBar.classList.remove("d-none");
+            txtHeaderSearch.focus();
+        });
+
+        btnCloseSearch.addEventListener("click", () => {
+            headerSearchBar.classList.add("d-none");
+            txtHeaderSearch.value = "";
+            window.filterActiveViewContent(""); // Bersihkan saringan pencarian
+        });
+    }
+
+    // E. MANUAL SYNC BUTTON
     btnSync.addEventListener("click", async () => {
         const icon = btnSync.querySelector("i");
         icon.classList.add("fa-spin");
@@ -110,7 +152,7 @@ function initUIOrchestrator(clientToken) {
         setTimeout(() => { icon.classList.remove("fa-spin"); }, 800);
     });
 
-    // D. SIDEBAR DRAWER MENU ACTIONS
+    // F. SIDEBAR DRAWER MENU ACTIONS (Hanya Menu Non-Bawaan AppSheet)
     const menuItems = document.querySelectorAll(".nav-menu-item[data-menu]");
     menuItems.forEach(item => {
         item.addEventListener("click", (e) => {
@@ -120,17 +162,11 @@ function initUIOrchestrator(clientToken) {
             sidebar.classList.remove("open");
             overlay.classList.remove("show");
 
-            if (targetMenuName === "tambah_unit") {
-                // Trigger form tambah unit baru (tanpa plat)
-                window.switchViewSPA("unit-form", "Tambah Unit Baru", true);
-                if (window.AMSUI) window.AMSUI.renderUnitForm("");
-            } else {
-                alert(`Modul "${targetMenuName}" terpilih.`);
-            }
+            alert(`Modul "${targetMenuName}" terpilih.`);
         });
     });
 
-    // E. SINKRONISASI STATUS ANTREAN OFFLINE TERTUNDA (SYNC QUEUE)
+    // G. SINKRONISASI STATUS ANTREAN OFFLINE TERTUNDA
     window.addEventListener('ams_queue_updated', (e) => {
         const queueLength = e.detail.queueLength;
         const offlineBox = document.getElementById("offlineStatusBox");
@@ -151,7 +187,7 @@ function initUIOrchestrator(clientToken) {
         }
     });
 
-    // F. AUTOMATIC INITIAL SYNC
+    // H. AUTOMATIC INITIAL SYNC
     if (window.AMSDatabase) {
         window.AMSDatabase.syncDataFromServer().then((success) => {
             if (success) {
@@ -160,3 +196,26 @@ function initUIOrchestrator(clientToken) {
         });
     }
 }
+
+/**
+ * 🔍 CORE FILTER: FITUR PENCARIAN UNIVERSAL DI HEADER (MENDUKUNG SEMUA VIEW)
+ * Mencari kecocokan teks secara dinamis di dalam kontainer view yang sedang aktif
+ */
+window.filterActiveViewContent = function(query) {
+    const activeView = document.querySelector('.app-view:not(.d-none)');
+    if (!activeView) return;
+
+    const q = query.toLowerCase().trim();
+    
+    // Cari semua elemen baris di dalam view yang aktif (bisa di list-container, table tr, atau list-group-item)
+    const rows = activeView.querySelectorAll('.list-container > div > div, .table tbody tr, .list-group-item');
+    
+    rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        if (text.includes(q)) {
+            row.style.setProperty('display', '', 'important');
+        } else {
+            row.style.setProperty('display', 'none', 'important');
+        }
+    });
+};
