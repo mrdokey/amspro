@@ -1,5 +1,5 @@
 // =========================================================================
-// AMS PRO - APP CONTROLLER & SPA ROUTER (MODULAR V1.4 - MULTI-FILTER)
+// AMS PRO - APP CONTROLLER & SPA ROUTER (MODULAR V1.5 - SCOPE LOCK FILTER)
 // =========================================================================
 
 const MASTER_GAS_URL = "https://script.google.com/macros/s/AKfycbxdnEun8-kSEK_9c0j8kQXMD6VNU8q_D-xGV-33dQ8SM6uuLZiGjDewh-RNPWq4YBHk/exec";
@@ -62,7 +62,7 @@ function initUIOrchestrator(clientToken) {
         lblHeaderTitle.innerText = customTitle;
         isSubViewActive = isSubView;
 
-        // RESET PENYARINGAN SAAT BERPINDAH TAB (Mencegah kebocoran filter antar halaman)
+        // 🔒 TUTUP & RESET FILTER SETIAP BERPINDAH VIEW (Mencegah Kebocoran Filter ke Tab Lain)
         if (headerSearchBar) {
             headerSearchBar.classList.add("d-none");
             if (txtHeaderSearch) txtHeaderSearch.value = "";
@@ -70,7 +70,7 @@ function initUIOrchestrator(clientToken) {
                 if (chip.getAttribute("data-filter") === "all") chip.classList.add("active");
                 else chip.classList.remove("active");
             });
-            window.filterActiveViewContent(); // Kembalikan visibilitas default semua baris
+            window.filterActiveViewContent(""); // Pulihkan semua baris Dashboard ke tampilan default
         }
 
         // ANIMASI NAVIGASI HEADER: Hamburger vs Back Arrow (<-)
@@ -78,6 +78,7 @@ function initUIOrchestrator(clientToken) {
         if (isSubView) {
             hamburgerIcon.className = "fas fa-arrow-left text-white";
             if (fabAddUnit) fabAddUnit.classList.add("d-none");
+            if (btnSearchTrigger) btnSearchTrigger.classList.add("d-none"); // Sembunyikan pencarian di sub-view
         } else {
             hamburgerIcon.className = "fas fa-bars text-white";
             lastActiveTab = viewId;
@@ -87,10 +88,13 @@ function initUIOrchestrator(clientToken) {
                 else btn.classList.remove("active");
             });
 
-            if (viewId === "dashboard" && fabAddUnit) {
-                fabAddUnit.classList.remove("d-none");
+            // 🔒 BATASI TAMPILAN ICON SEARCH & BUTTON MELAYANG (HANYA DI DASHBOARD UNIT)
+            if (viewId === "dashboard") {
+                if (fabAddUnit) fabAddUnit.classList.remove("d-none");
+                if (btnSearchTrigger) btnSearchTrigger.classList.remove("d-none"); // Tampilkan ikon search hanya di Dashboard
             } else {
                 if (fabAddUnit) fabAddUnit.classList.add("d-none");
+                if (btnSearchTrigger) btnSearchTrigger.classList.add("d-none"); // Sembunyikan ikon search di tab lain
             }
         }
     };
@@ -127,20 +131,16 @@ function initUIOrchestrator(clientToken) {
         });
     }
 
-    // D. PENANGANAN AKTIF TOMBOL SARINGAN CHIP (FILTER CHIPS EVENT)
+    // D. PENANGANAN KLIK CHIP SARINGAN (HANYA BERLAKU DI DASHBOARD)
     filterChips.forEach(chip => {
         chip.addEventListener("click", () => {
-            // Matikan status aktif di semua chip saringan
             filterChips.forEach(c => c.classList.remove("active"));
-            // Nyalakan status aktif di chip yang ditekan
             chip.classList.add("active");
-            
-            // Picu pembaruan saringan konten secara instan
             window.filterActiveViewContent();
         });
     });
 
-    // E. SINKRONISASI PENCARIAN HEADER SECARA UNIVERSAL
+    // E. SINKRONISASI PENCARIAN HEADER
     if (btnSearchTrigger && headerSearchBar && btnCloseSearch) {
         btnSearchTrigger.addEventListener("click", () => {
             headerSearchBar.classList.remove("d-none");
@@ -154,7 +154,7 @@ function initUIOrchestrator(clientToken) {
                 if (c.getAttribute("data-filter") === "all") c.classList.add("active");
                 else c.classList.remove("active");
             });
-            window.filterActiveViewContent(); // Kembalikan semua baris
+            window.filterActiveViewContent();
         });
     }
 
@@ -177,7 +177,7 @@ function initUIOrchestrator(clientToken) {
         setTimeout(() => { icon.classList.remove("fa-spin"); }, 800);
     });
 
-    // G. SIDEBAR DRAWER MENU ACTIONS
+    // G. SIDEBAR DRAWER MENU ACTIONS (Hanya memuat Profile, Cari Unit, dll. Menu Tambah Unit telah dihapus)
     const menuItems = document.querySelectorAll(".nav-menu-item[data-menu]");
     menuItems.forEach(item => {
         item.addEventListener("click", (e) => {
@@ -221,32 +221,28 @@ function initUIOrchestrator(clientToken) {
 }
 
 /**
- * 🔍 CORE FILTER: FITUR SINKRONISASI MULTI-FILTER DI HEADER (TEKS + KATEGORI OFFLINE)
- * Menangani pencarian teks dan filter status ketersediaan secara bersamaan
+ * 🔒 KUNCI CAKUPAN FILTER: SINKRONISASI FILTER UNIT DI MENU DASHBOARD
+ * Hanya menyaring baris motor (.d-flex) pada view Dashboard untuk menjaga keaslian tab lain.
  */
 window.filterActiveViewContent = function(query) {
-    const activeView = document.querySelector('.app-view:not(.d-none)');
-    if (!activeView) return;
+    const dashboardView = document.getElementById('view-dashboard');
+    if (!dashboardView || dashboardView.classList.contains('d-none')) return; // Abaikan jika tidak di Dashboard
 
-    const q = query.toLowerCase().trim();
+    const txtSearch = document.getElementById("txtHeaderSearch");
+    const q = (query !== undefined ? query : (txtSearch ? txtSearch.value : "")).toLowerCase().trim();
     
-    // Temukan filter status aktif dari tombol chip tag
     const activeChip = document.querySelector(".badge-chip.active");
     const activeFilterTag = activeChip ? activeChip.getAttribute("data-filter").toLowerCase().trim() : "all";
 
-    // Kumpulkan seluruh elemen baris data yang ada di halaman aktif
-    const rows = activeView.querySelectorAll('.list-container > div > div, .table tbody tr, .list-group-item');
+    // 🔒 Hanya saring baris motor di kontainer list Dashboard (.list-container)
+    const rows = dashboardView.querySelectorAll('.list-container .d-flex');
     
     rows.forEach(row => {
         const rowText = row.innerText.toLowerCase();
-        
-        // A. Validasi Teks Pencarian
         const matchesQuery = rowText.includes(q);
         
-        // B. Validasi Filter Status Chip
         let matchesStatusFilter = true;
         if (activeFilterTag !== "all") {
-            // Saring berdasarkan teks status (tersedia/standby, rent/disewa, atau servis/bengkel)
             if (activeFilterTag === "available") {
                 matchesStatusFilter = rowText.includes("available") || rowText.includes("standby");
             } else if (activeFilterTag === "rent") {
@@ -256,7 +252,6 @@ window.filterActiveViewContent = function(query) {
             }
         }
 
-        // C. Gabungkan Kedua Validasi (Multi-Criteria Gate)
         if (matchesQuery && matchesStatusFilter) {
             row.style.setProperty('display', '', 'important');
         } else {
